@@ -23,6 +23,8 @@ warnings.filterwarnings('ignore')
 import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 
 pd.options.display.max_rows = 100
 pd.options.display.max_columns = 100
@@ -143,7 +145,6 @@ def get_titles():
 get_titles()
 
 #processing ages
-#
 
 def process_age():
     global combined
@@ -305,19 +306,51 @@ process_family()
 #before modelling, we will drop the passenger id column as it conveys no meaningful informtion
 
 combined.drop('PassengerId', axis = 1, inplace = True)
-print(combined.shape)
 
 
+# Modelling - Feature Selection
+
+def partition_sets():
+    global combined
+    train0 = pd.read_csv('/home/anirban727/Downloads/Kaggle Titanic/train.csv')
+    target = train0.Survived
+    train = combined.head(891)
+    test  = combined.iloc[891:]
+    return train, test, target
+
+train, test, target = partition_sets()
 
 
+logreg = LogisticRegression()
+logreg.fit(train, target)
+pred = logreg.predict(test)
+logscore = logreg.score(train, target)
+#logscore = 0.837261503928
+
+rforest = RandomForestClassifier(n_estimators=100)
+rforest.fit(train, target)
+pred = rforest.predict(test)
+randscore = rforest.score(train, target)
+#randscore = 0.99214365881
 
 
+features = pd.DataFrame()
+features['feature'] = train.columns
+features['importance'] = rforest.feature_importances_
+features.sort_values(by=['importance'], ascending=True, inplace=True)
+features.set_index('feature', inplace=True)
 
+features.plot(kind='barh', figsize=(20, 15))
 
+# submitting prediction and writing out to the test set
+aux = pd.read_csv('/home/anirban727/Downloads/Kaggle Titanic/test.csv')
+submission = pd.DataFrame({
+        "PassengerId": aux["PassengerId"],
+        "Survived"   : pred
+    })
 
-
-
-
+merged = submission.merge(aux, on = "PassengerId")
+merged.to_csv('titanic.csv', index=False)
 
 
 
