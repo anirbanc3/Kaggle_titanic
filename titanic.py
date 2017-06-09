@@ -20,11 +20,15 @@ HTML("""
 import warnings
 warnings.filterwarnings('ignore')
 
+#%matplotlib inline
 import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.cross_validation import StratifiedKFold
+from sklearn.grid_search import GridSearchCV
 
 pd.options.display.max_rows = 100
 pd.options.display.max_columns = 100
@@ -320,27 +324,61 @@ def partition_sets():
 
 train, test, target = partition_sets()
 
+#
+#logreg = LogisticRegression()
+#logreg.fit(train, target)
+#pred = logreg.predict(test)
+#logscore = logreg.score(train, target)
+##logscore = 0.837261503928
 
-logreg = LogisticRegression()
-logreg.fit(train, target)
-pred = logreg.predict(test)
-logscore = logreg.score(train, target)
-#logscore = 0.837261503928
-
-rforest = RandomForestClassifier(n_estimators=100)
+rforest = RandomForestClassifier(n_estimators=50, max_features='sqrt')
 rforest.fit(train, target)
-pred = rforest.predict(test)
-randscore = rforest.score(train, target)
-#randscore = 0.99214365881
-
 
 features = pd.DataFrame()
 features['feature'] = train.columns
 features['importance'] = rforest.feature_importances_
 features.sort_values(by=['importance'], ascending=True, inplace=True)
 features.set_index('feature', inplace=True)
-
 features.plot(kind='barh', figsize=(20, 15))
+
+model = SelectFromModel(rforest, prefit = True)
+train_reduced = model.transform(train)
+test_reduced  = model.transform(test)
+
+
+run_gs = False
+
+if run_gs:
+    parameter_grid = {
+                 'max_depth' : [4, 6, 8],
+                 'n_estimators': [50, 10],
+                 'max_features': ['sqrt', 'auto', 'log2'],
+                 'min_samples_split': [1, 3, 10],
+                 'min_samples_leaf': [1, 3, 10],
+                 'bootstrap': [True, False],
+                 }
+    forest = RandomForestClassifier()
+    cross_validation = StratifiedKFold(target, n_folds=5)
+
+    grid_search = GridSearchCV(forest,
+                               scoring='accuracy',
+                               param_grid=parameter_grid,
+                               cv=cross_validation)
+
+    grid_search.fit(train, target)
+    model = grid_search
+    parameters = grid_search.best_params_
+
+    print('Best score: {}'.format(grid_search.best_score_))
+    print('Best parameters: {}'.format(grid_search.best_params_))
+else: 
+    parameters = {'bootstrap': False, 'min_samples_leaf': 3, 'n_estimators': 50, 
+                  'min_samples_split': 10, 'max_features': 'sqrt', 'max_depth': 6}
+    
+    model = RandomForestClassifier(**parameters)
+    model.fit(train, target)
+    
+pred = model.predict(test).astype(int)
 
 # submitting prediction and writing out to the test set
 aux = pd.read_csv('/home/anirban727/Downloads/Kaggle Titanic/test.csv')
@@ -349,8 +387,11 @@ submission = pd.DataFrame({
         "Survived"   : pred
     })
 
-merged = submission.merge(aux, on = "PassengerId")
-merged.to_csv('titanic.csv', index=False)
+#merged = submission.merge(aux, on = "PassengerId")
+#merged.to_csv('titanic.csv', index=False)
+
+submission.to_csv('titanic.csv', index=False)
+
 
 
 
