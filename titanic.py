@@ -311,6 +311,7 @@ process_family()
 
 combined.drop('PassengerId', axis = 1, inplace = True)
 
+combined = combined.apply(lambda r: r/max(r))
 
 # Modelling - Feature Selection
 
@@ -345,38 +346,11 @@ model = SelectFromModel(rforest, prefit = True)
 train_reduced = model.transform(train)
 test_reduced  = model.transform(test)
 
-
-run_gs = False
-
-if run_gs:
-    parameter_grid = {
-                 'max_depth' : [4, 6, 8],
-                 'n_estimators': [50, 10],
-                 'max_features': ['sqrt', 'auto', 'log2'],
-                 'min_samples_split': [1, 3, 10],
-                 'min_samples_leaf': [1, 3, 10],
-                 'bootstrap': [True, False],
-                 }
-    forest = RandomForestClassifier()
-    cross_validation = StratifiedKFold(target, n_folds=5)
-
-    grid_search = GridSearchCV(forest,
-                               scoring='accuracy',
-                               param_grid=parameter_grid,
-                               cv=cross_validation)
-
-    grid_search.fit(train, target)
-    model = grid_search
-    parameters = grid_search.best_params_
-
-    print('Best score: {}'.format(grid_search.best_score_))
-    print('Best parameters: {}'.format(grid_search.best_params_))
-else: 
-    parameters = {'bootstrap': False, 'min_samples_leaf': 3, 'n_estimators': 50, 
-                  'min_samples_split': 10, 'max_features': 'sqrt', 'max_depth': 6}
+parameters = {'bootstrap': False, 'min_samples_leaf': 3, 'n_estimators': 50, 
+              'min_samples_split': 10, 'max_features': 'sqrt', 'max_depth': 6}
     
-    model = RandomForestClassifier(**parameters)
-    model.fit(train, target)
+model = RandomForestClassifier(**parameters)
+model.fit(train, target)
     
 pred = model.predict(test).astype(int)
 
